@@ -4,115 +4,137 @@
  *
  * @format
  */
+import notifee, {
+  AndroidChannel,
+  AndroidImportance,
+  AndroidNotificationSetting,
+  AuthorizationStatus,
+  IOSNotificationCategory,
+  TimestampTrigger,
+  TriggerType,
+} from '@notifee/react-native';
+import React, {useEffect} from 'react';
+import {Button, SafeAreaView} from 'react-native';
 
-import React from 'react';
-import type {PropsWithChildren} from 'react';
-import {
-  SafeAreaView,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  useColorScheme,
-  View,
-} from 'react-native';
+export enum NotificationType {
+  GameReview,
+}
 
-import {
-  Colors,
-  DebugInstructions,
-  Header,
-  LearnMoreLinks,
-  ReloadInstructions,
-} from 'react-native/Libraries/NewAppScreen';
+export enum NotificationCategory {
+  GameReview = 'game-review',
+}
 
-type SectionProps = PropsWithChildren<{
-  title: string;
-}>;
+export enum NotificationChannel {
+  Default = 'default',
+}
 
-function Section({children, title}: SectionProps): React.JSX.Element {
-  const isDarkMode = useColorScheme() === 'dark';
-  return (
-    <View style={styles.sectionContainer}>
-      <Text
-        style={[
-          styles.sectionTitle,
-          {
-            color: isDarkMode ? Colors.white : Colors.black,
-          },
-        ]}>
-        {title}
-      </Text>
-      <Text
-        style={[
-          styles.sectionDescription,
-          {
-            color: isDarkMode ? Colors.light : Colors.dark,
-          },
-        ]}>
-        {children}
-      </Text>
-    </View>
-  );
+export enum NotificationPressAction {
+  SubmitReview = 'submit-review',
+}
+
+const androidChannels: AndroidChannel[] = [
+  {
+    id: NotificationChannel.Default,
+    name: 'Default',
+    description: 'General app notifications.',
+    importance: AndroidImportance.HIGH,
+    badge: false,
+  },
+];
+
+const iosCategories: IOSNotificationCategory[] = [
+  {
+    id: NotificationCategory.GameReview,
+    actions: [
+      {
+        id: NotificationPressAction.SubmitReview,
+        title: 'Review Game',
+        input: {
+          placeholderText: 'Type your review...',
+          buttonText: 'Submit',
+        },
+      },
+    ],
+  },
+];
+
+export async function setupNotifications() {
+  const permission = await notifee.requestPermission();
+
+  if (permission.authorizationStatus === AuthorizationStatus.AUTHORIZED) {
+    await notifee.setNotificationCategories(iosCategories);
+    await notifee.createChannels(androidChannels);
+
+    const settings = await notifee.getNotificationSettings();
+
+    if (settings.android.alarm !== AndroidNotificationSetting.ENABLED) {
+      await notifee.openAlarmPermissionSettings();
+    }
+  }
 }
 
 function App(): React.JSX.Element {
-  const isDarkMode = useColorScheme() === 'dark';
+  useEffect(() => {
+    return notifee.onForegroundEvent(async ({type}) => {
+      console.log('Foreground Event', type);
+    });
+  }, []);
 
-  const backgroundStyle = {
-    backgroundColor: isDarkMode ? Colors.darker : Colors.lighter,
-  };
+  useEffect(() => {
+    notifee.getInitialNotification().then(_n => {
+      console.log('Initial Notification Event');
+    });
+  }, []);
+
+  function showNotification(shouldSchedule?: boolean) {
+    const trigger: TimestampTrigger = shouldSchedule
+      ? {
+          type: TriggerType.TIMESTAMP,
+          timestamp: Date.now() + 5000,
+        }
+      : (undefined as unknown as TimestampTrigger);
+
+    const notificationFn = shouldSchedule
+      ? notifee.createTriggerNotification
+      : notifee.displayNotification;
+
+    notificationFn(
+      {
+        title: 'Please Review: Mario',
+        body: 'Looks like you enjoyed this game! Please leave a review!',
+        data: {
+          notificationType: NotificationType.GameReview,
+          gameId: 1234,
+          gameName: 'Mario',
+        },
+        ios: {
+          categoryId: NotificationCategory.GameReview,
+        },
+        android: {
+          channelId: NotificationChannel.Default,
+          actions: [
+            {
+              title: 'Review Game',
+              input: true,
+              pressAction: {
+                id: NotificationPressAction.SubmitReview,
+              },
+            },
+          ],
+        },
+      },
+      trigger,
+    );
+  }
 
   return (
-    <SafeAreaView style={backgroundStyle}>
-      <StatusBar
-        barStyle={isDarkMode ? 'light-content' : 'dark-content'}
-        backgroundColor={backgroundStyle.backgroundColor}
+    <SafeAreaView>
+      <Button onPress={() => showNotification()} title="Show Notification" />
+      <Button
+        onPress={() => showNotification(true)}
+        title="Schedule Notification"
       />
-      <ScrollView
-        contentInsetAdjustmentBehavior="automatic"
-        style={backgroundStyle}>
-        <Header />
-        <View
-          style={{
-            backgroundColor: isDarkMode ? Colors.black : Colors.white,
-          }}>
-          <Section title="Step One">
-            Edit <Text style={styles.highlight}>App.tsx</Text> to change this
-            screen and then come back to see your edits.
-          </Section>
-          <Section title="See Your Changes">
-            <ReloadInstructions />
-          </Section>
-          <Section title="Debug">
-            <DebugInstructions />
-          </Section>
-          <Section title="Learn More">
-            Read the docs to discover what to do next:
-          </Section>
-          <LearnMoreLinks />
-        </View>
-      </ScrollView>
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  sectionContainer: {
-    marginTop: 32,
-    paddingHorizontal: 24,
-  },
-  sectionTitle: {
-    fontSize: 24,
-    fontWeight: '600',
-  },
-  sectionDescription: {
-    marginTop: 8,
-    fontSize: 18,
-    fontWeight: '400',
-  },
-  highlight: {
-    fontWeight: '700',
-  },
-});
-
 export default App;
