@@ -9,6 +9,7 @@ import notifee, {
   AndroidImportance,
   AndroidNotificationSetting,
   AuthorizationStatus,
+  EventType,
   IOSNotificationCategory,
   TimestampTrigger,
   TriggerType,
@@ -21,7 +22,8 @@ export enum NotificationType {
 }
 
 export enum NotificationCategory {
-  GameReview = 'game-review',
+  WriteReview = 'write-review',
+  GoToReview = 'go-to-review',
 }
 
 export enum NotificationChannel {
@@ -29,6 +31,7 @@ export enum NotificationChannel {
 }
 
 export enum NotificationPressAction {
+  Default = 'default',
   SubmitReview = 'submit-review',
 }
 
@@ -44,7 +47,7 @@ const androidChannels: AndroidChannel[] = [
 
 const iosCategories: IOSNotificationCategory[] = [
   {
-    id: NotificationCategory.GameReview,
+    id: NotificationCategory.WriteReview,
     actions: [
       {
         id: NotificationPressAction.SubmitReview,
@@ -53,6 +56,15 @@ const iosCategories: IOSNotificationCategory[] = [
           placeholderText: 'Type your review...',
           buttonText: 'Submit',
         },
+      },
+    ],
+  },
+  {
+    id: NotificationCategory.GoToReview,
+    actions: [
+      {
+        id: NotificationPressAction.SubmitReview,
+        title: 'Review Game',
       },
     ],
   },
@@ -76,7 +88,7 @@ export async function setupNotifications() {
 function App(): React.JSX.Element {
   useEffect(() => {
     return notifee.onForegroundEvent(async ({type}) => {
-      console.log('Foreground Event', type);
+      console.log('Foreground Event', EventType[type]);
     });
   }, []);
 
@@ -86,7 +98,10 @@ function App(): React.JSX.Element {
     });
   }, []);
 
-  function showNotification(shouldSchedule?: boolean) {
+  function showNotification(
+    shouldSchedule: boolean,
+    shouldIncludeInput?: true | undefined,
+  ) {
     const trigger: TimestampTrigger = shouldSchedule
       ? {
           type: TriggerType.TIMESTAMP,
@@ -108,14 +123,16 @@ function App(): React.JSX.Element {
           gameName: 'Mario',
         },
         ios: {
-          categoryId: NotificationCategory.GameReview,
+          categoryId: shouldIncludeInput
+            ? NotificationCategory.WriteReview
+            : NotificationCategory.GoToReview,
         },
         android: {
           channelId: NotificationChannel.Default,
           actions: [
             {
               title: 'Review Game',
-              input: true,
+              input: shouldIncludeInput,
               pressAction: {
                 id: NotificationPressAction.SubmitReview,
               },
@@ -128,11 +145,22 @@ function App(): React.JSX.Element {
   }
 
   return (
-    <SafeAreaView>
-      <Button onPress={() => showNotification()} title="Show Notification" />
+    <SafeAreaView style={{gap: 20}}>
       <Button
-        onPress={() => showNotification(true)}
+        onPress={() => showNotification(false, undefined)}
+        title="Show Notification"
+      />
+      <Button
+        onPress={() => showNotification(true, undefined)}
         title="Schedule Notification"
+      />
+      <Button
+        onPress={() => showNotification(false, true)}
+        title="Show Notification w/ Input"
+      />
+      <Button
+        onPress={() => showNotification(true, true)}
+        title="Schedule Notification w/ Input"
       />
     </SafeAreaView>
   );
